@@ -9,64 +9,63 @@ type Props = {
   handleDeleteAllCompletedTodos: () => void;
 };
 
-export const Footer: React.FC<Props> = ({
-  todos,
-  filterStatus,
-  setFilterStatus,
-  handleDeleteAllCompletedTodos,
-}) => {
-  const countActiveTodo = todos.filter(todo => !todo.completed).length;
-  const isCompletedEnabled = todos.some(todo => todo.completed);
+export const Footer: React.FC<Props> = React.memo(
+  ({ todos, filterStatus, setFilterStatus, handleDeleteAllCompletedTodos }) => {
+    const countActiveTodo = todos.filter(todo => !todo.completed).length;
+    const isCompletedEnabled = todos.some(todo => todo.completed);
 
-  return (
-    <footer className="todoapp__footer" data-cy="Footer">
-      <span className="todo-count" data-cy="TodosCounter">
-        {countActiveTodo} items left
-      </span>
-      <nav className="filter" data-cy="Filter">
-        <a
-          href="#/"
-          className={classNames('filter__link', {
-            selected: filterStatus === FilterStatus.ALL,
-          })}
-          data-cy="FilterLinkAll"
-          onClick={() => setFilterStatus(FilterStatus.ALL)}
+    return (
+      <footer className="todoapp__footer" data-cy="Footer">
+        <span className="todo-count" data-cy="TodosCounter">
+          {countActiveTodo} items left
+        </span>
+        <nav className="filter" data-cy="Filter">
+          <a
+            href="#/"
+            className={classNames('filter__link', {
+              selected: filterStatus === FilterStatus.ALL,
+            })}
+            data-cy="FilterLinkAll"
+            onClick={() => setFilterStatus(FilterStatus.ALL)}
+          >
+            All
+          </a>
+
+          <a
+            href="#/active"
+            className={classNames('filter__link', {
+              selected: filterStatus === FilterStatus.ACTIVE,
+            })}
+            onClick={() => setFilterStatus(FilterStatus.ACTIVE)}
+            data-cy="FilterLinkActive"
+          >
+            Active
+          </a>
+
+          <a
+            href="#/completed"
+            className={classNames('filter__link', {
+              selected: filterStatus === FilterStatus.COMPLETED,
+            })}
+            onClick={() => setFilterStatus(FilterStatus.COMPLETED)}
+            data-cy="FilterLinkCompleted"
+          >
+            Completed
+          </a>
+        </nav>
+
+        <button
+          type="button"
+          className="todoapp__clear-completed"
+          data-cy="ClearCompletedButton"
+          disabled={!isCompletedEnabled}
+          onClick={handleDeleteAllCompletedTodos}
         >
-          All
-        </a>
+          Clear completed
+        </button>
+      </footer>
+    );
+  },
+);
 
-        <a
-          href="#/active"
-          className={classNames('filter__link', {
-            selected: filterStatus === FilterStatus.ACTIVE,
-          })}
-          onClick={() => setFilterStatus(FilterStatus.ACTIVE)}
-          data-cy="FilterLinkActive"
-        >
-          Active
-        </a>
-
-        <a
-          href="#/completed"
-          className={classNames('filter__link', {
-            selected: filterStatus === FilterStatus.COMPLETED,
-          })}
-          onClick={() => setFilterStatus(FilterStatus.COMPLETED)}
-          data-cy="FilterLinkCompleted"
-        >
-          Completed
-        </a>
-      </nav>
-
-      <button
-        type="button"
-        className="todoapp__clear-completed"
-        data-cy="ClearCompletedButton"
-        disabled={!isCompletedEnabled}
-        onClick={handleDeleteAllCompletedTodos}
-      >
-        Clear completed
-      </button>
-    </footer>
-  );
-};
+Footer.displayName = 'Footer';

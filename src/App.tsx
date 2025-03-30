@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as todoService from './api/httpClient';
 import { ErrorMessages, FilterStatus, Todo } from './types/Todo';
 import { Header } from './component/Header';
@@ -21,22 +21,24 @@ export const App: React.FC = () => {
   const [query, setQuery] = useState('');
   const [isLoadingTodo, setIsLoadingTodo] = useState<number[]>([]);
 
-  function loadTodos() {
+  const handleErrorMessage = useCallback((message: ErrorMessages) => {
+    setErrorMessage(message);
+    const timeoutId = setTimeout(() => {
+      setErrorMessage(ErrorMessages.DEFAULT);
+    }, 3000);
+
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
     setIsLoading(true);
 
     todoService
       .getTodos()
       .then(setTodos)
-      .catch(() => {
-        setErrorMessage(ErrorMessages.LOAD_TODOS);
-        setTimeout(() => {
-          setErrorMessage(ErrorMessages.DEFAULT);
-        }, 3000);
-      })
+      .catch(() => handleErrorMessage(ErrorMessages.LOAD_TODOS))
       .finally(() => setIsLoading(false));
-  }
-
-  useEffect(loadTodos, []);
+  }, [handleErrorMessage]);
 
   const filteredTodos = todos.filter(todo => {
     switch (filterStatus) {
@@ -55,53 +57,59 @@ export const App: React.FC = () => {
     inputRef.current?.focus();
   }, []);
 
-  const handleAddTodo = ({ id, title, completed, userId }: Todo) => {
-    setTempTodo({ id, title, completed, userId });
-    (inputRef.current as HTMLInputElement).disabled = true;
+  const handleAddTodo = useCallback(
+    ({ id, title, completed, userId }: Todo) => {
+      if (!query.trim()) {
+        handleErrorMessage(ErrorMessages.EMPTY_TITLE);
 
-    todoService
-      .createTodo({ title, completed, userId })
-      .then(newTodo => {
-        setTodos(currentTodos => [...currentTodos, newTodo]);
-        setTempTodo(null);
-        setQuery('');
-        (inputRef.current as HTMLInputElement).disabled = false;
-        inputRef.current?.focus();
-      })
-      .catch(() => {
-        setErrorMessage(ErrorMessages.ADD_TODO);
-        setTimeout(() => {
-          setErrorMessage(ErrorMessages.DEFAULT);
-        }, 3000);
-        setTempTodo(null);
-        (inputRef.current as HTMLInputElement).disabled = false;
-        inputRef.current?.focus();
-      });
-  };
+        return;
+      }
 
-  const handleDeleteTodo = (todoId: number) => {
-    setIsLoadingTodo(prev => [...prev, todoId]);
-    todoService
-      .deleteTodo(todoId)
-      .then(() => {
-        const selectedTodo = todos.filter(todo => todo.id !== todoId);
+      setTempTodo({ id, title, completed, userId });
+      (inputRef.current as HTMLInputElement).disabled = true;
 
-        setTodos(selectedTodo);
-        inputRef.current?.focus();
-      })
-      .catch(() => {
-        setErrorMessage(ErrorMessages.DELETE_TODO);
-        setTimeout(() => {
-          setErrorMessage(ErrorMessages.DEFAULT);
-        }, 3000);
-        inputRef.current?.focus();
-      })
-      .finally(() =>
-        setIsLoadingTodo(prev => prev.filter(id => id !== todoId)),
-      );
-  };
+      todoService
+        .createTodo({ title, completed, userId })
+        .then(newTodo => {
+          setTodos(currentTodos => [...currentTodos, newTodo]);
+          setTempTodo(null);
+          setQuery('');
+          (inputRef.current as HTMLInputElement).disabled = false;
+          inputRef.current?.focus();
+        })
+        .catch(() => {
+          handleErrorMessage(ErrorMessages.ADD_TODO);
+          setTempTodo(null);
+          (inputRef.current as HTMLInputElement).disabled = false;
+          inputRef.current?.focus();
+        });
+    },
+    [handleErrorMessage, query],
+  );
 
-  const handleDeleteAllCompletedTodos = () => {
+  const handleDeleteTodo = useCallback(
+    (todoId: number) => {
+      setIsLoadingTodo(prev => [...prev, todoId]);
+      todoService
+        .deleteTodo(todoId)
+        .then(() => {
+          const selectedTodo = todos.filter(todo => todo.id !== todoId);
+
+          setTodos(selectedTodo);
+          inputRef.current?.focus();
+        })
+        .catch(() => {
+          handleErrorMessage(ErrorMessages.DELETE_TODO);
+          inputRef.current?.focus();
+        })
+        .finally(() =>
+          setIsLoadingTodo(prev => prev.filter(id => id !== todoId)),
+        );
+    },
+    [handleErrorMessage, todos],
+  );
+
+  const handleDeleteAllCompletedTodos = useCallback(() => {
     const completedTodos = todos.filter(todo => todo.completed);
 
     if (completedTodos.length === 0) {
@@ -120,49 +128,55 @@ export const App: React.FC = () => {
           inputRef.current?.focus();
         })
         .catch(() => {
-          setErrorMessage(ErrorMessages.DELETE_TODO);
-          setTimeout(() => {
-            setErrorMessage(ErrorMessages.DEFAULT);
-          }, 3000);
+          handleErrorMessage(ErrorMessages.DELETE_TODO);
           inputRef.current?.focus();
         })
         .finally(() => {
           setIsLoadingTodo([]);
         }),
     );
-  };
+  }, [handleErrorMessage, todos]);
 
-  const handleUpdateTodo = (updatedTodo: Todo) => {
-    setIsLoadingTodo([...isLoadingTodo, updatedTodo.id]);
-    todoService
-      .updateTodo(updatedTodo)
-      .then(todo => {
-        setTodos(currentTodos => {
-          return currentTodos.map(item => (todo.id === item.id ? todo : item));
+  const handleUpdateTodo = useCallback(
+    (updatedTodo: Todo) => {
+      setIsLoadingTodo(prev => [...prev, updatedTodo.id]);
+      todoService
+        .updateTodo(updatedTodo)
+        .then(todo => {
+          setTodos(currentTodos => {
+            return currentTodos.map(item =>
+              todo.id === item.id ? todo : item,
+            );
+          });
+        })
+        .catch(() => {
+          setIsLoadingTodo(isLoadingTodo.filter(id => id !== updatedTodo.id));
+          handleErrorMessage(ErrorMessages.UPDATE_TODO);
+        })
+        .finally(() => {
+          setIsLoadingTodo(ids => ids.filter(id => id !== updatedTodo.id));
         });
-      })
-      .catch(() => {
-        setIsLoadingTodo(isLoadingTodo.filter(id => id !== updatedTodo.id));
-        setErrorMessage(ErrorMessages.UPDATE_TODO);
-        setTimeout(() => {
-          setErrorMessage(ErrorMessages.DEFAULT);
-        }, 3000);
-      })
-      .finally(() => {
-        setIsLoadingTodo(ids => ids.filter(id => id !== updatedTodo.id));
-      });
-  };
+    },
+    [handleErrorMessage, isLoadingTodo],
+  );
 
-  const handleChangeCompletedAllTodos = () => {
+  const handleChangeCompletedAllTodos = useCallback(() => {
     const areAllCompleted = todos.every(todo => todo.completed);
+    const updatedTodos = todos.map(todo => ({
+      ...todo,
+      completed: !areAllCompleted,
+    }));
 
-    setTodos(
-      todos.map(todo => ({
-        ...todo,
-        completed: !areAllCompleted,
-      })),
-    );
-  };
+    setTodos(updatedTodos);
+    setIsLoadingTodo(todos.map(todo => todo.id));
+
+    Promise.all(updatedTodos.map(todo => todoService.updateTodo(todo)))
+      .catch(() => {
+        handleErrorMessage(ErrorMessages.UPDATE_TODO);
+        setTodos(todos);
+      })
+      .finally(() => setIsLoadingTodo([]));
+  }, [todos, handleErrorMessage]);
 
   if (!todoService.USER_ID) {
     return <UserWarning />;
@@ -177,7 +191,6 @@ export const App: React.FC = () => {
           todos={todos}
           handleChangeCompletedAllTodos={handleChangeCompletedAllTodos}
           handleAddTodo={handleAddTodo}
-          setErrorMessage={setErrorMessage}
           query={query}
           setQuery={setQuery}
           inputRef={inputRef}

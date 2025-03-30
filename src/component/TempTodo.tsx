@@ -7,7 +7,7 @@ type Props = {
   tempTodo: Todo | null;
 };
 
-export const TempTodo: React.FC<Props> = ({ tempTodo }) => {
+export const TempTodo: React.FC<Props> = React.memo(({ tempTodo }) => {
   return (
     <div data-cy="Todo" className="todo">
       <label className="todo__status-label">
@@ -28,4 +28,6 @@ export const TempTodo: React.FC<Props> = ({ tempTodo }) => {
       </div>
     </div>
   );
-};
+});
+
+TempTodo.displayName = 'TempTodo';
